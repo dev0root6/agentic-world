@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Agent World</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --bg2: #111118;
+    --bg3: #1a1a24;
+    --border: rgba(255,255,255,0.07);
+    --border2: rgba(255,255,255,0.12);
+    --text: #e8e8f0;
+    --muted: #7070a0;
+    --accent: #7c5cfc;
+    --accent2: #4ecdc4;
+    --danger: #ff6b6b;
+    --warn: #f7dc6f;
+    --green: #4ade80;
+    --font-display: 'Syne', sans-serif;
+    --font-mono: 'Space Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    padding: 0 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+    position: sticky;
+    top: 0;
+    background: rgba(10,10,15,0.92);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  nav { display: flex; gap: 4px; }
+
+  nav button {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-radius: 6px;
+    transition: all 0.15s;
+    letter-spacing: 0.5px;
+  }
+
+  nav button:hover { color: var(--text); background: var(--bg3); }
+  nav button.active { color: var(--accent); background: rgba(124,92,252,0.12); }
+
+  .tick-btn {
+    background: var(--accent) !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    padding: 6px 16px !important;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    transition: all 0.15s;
+  }
+
+  .tick-btn:hover { background: #6344e8 !important; transform: translateY(-1px); }
+  .tick-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+
+  /* ── Layout ── */
+  .app { max-width: 1200px; margin: 0 auto; padding: 24px; }
+
+  /* ── Crisis Banner ── */
+  .crisis-banner {
+    background: linear-gradient(135deg, rgba(255,107,107,0.1), rgba(247,220,111,0.08));
+    border: 1px solid rgba(255,107,107,0.25);
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    animation: fadeIn 0.4s ease;
+  }
+
+  .crisis-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--danger);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .crisis-text {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffcfcf;
+    flex: 1;
+  }
+
+  .crisis-actions { display: flex; align-items: center; gap: 10px; }
+
+  .tick-badge {
+    font-size: 11px;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .btn-new-crisis {
+    background: none;
+    border: 1px solid rgba(255,107,107,0.4);
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn-new-crisis:hover { background: rgba(255,107,107,0.1); }
+
+  /* ── Grid Layout ── */
+  .world-layout {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 20px;
+    align-items: start;
+  }
+
+  /* ── Feed ── */
+  .feed-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+
+  .section-title {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .live-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 10px;
+    color: var(--green);
+    letter-spacing: 1px;
+  }
+
+  .live-dot::before {
+    content: '';
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--green);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+
+  .feed { display: flex; flex-direction: column; gap: 10px; }
+
+  .feed-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    animation: slideIn 0.3s ease;
+    transition: border-color 0.2s;
+    cursor: pointer;
+  }
+
+  .feed-item:hover { border-color: var(--border2); }
+  .feed-item.crisis { border-left: 3px solid var(--danger); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; } to { opacity: 1; }
+  }
+
+  .feed-item-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .agent-avatar {
+    font-size: 22px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .agent-info { flex: 1; min-width: 0; }
+
+  .agent-name {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .agent-meta {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 1px;
+  }
+
+  .action-badge {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    flex-shrink: 0;
+  }
+
+  .badge-WORK        { background: rgba(78,205,196,0.15); color: #4ecdc4; }
+  .badge-TALK        { background: rgba(124,92,252,0.15); color: #a78bfa; }
+  .badge-SOLVE       { background: rgba(255,107,107,0.15); color: #ff8080; }
+  .badge-THINK       { background: rgba(247,220,111,0.15); color: #f7dc6f; }
+  .badge-COLLABORATE { background: rgba(74,222,128,0.15);  color: #4ade80; }
+
+  .feed-thought {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    margin-bottom: 6px;
+    border-left: 2px solid var(--border2);
+    padding-left: 10px;
+  }
+
+  .feed-action {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 5px;
+  }
+
+  .feed-result {
+    font-size: 12px;
+    color: rgba(232,232,240,0.75);
+    line-height: 1.5;
+  }
+
+  .feed-pts {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 8px;
+    font-size: 11px;
+    color: var(--warn);
+    font-weight: 700;
+  }
+
+  .feed-time {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 4px;
+  }
+
+  /* ── Sidebar ── */
+  .sidebar { display: flex; flex-direction: column; gap: 16px; }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .card-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    font-size: 10px;
+    margin-bottom: 14px;
+  }
+
+  /* ── Mini Leaderboard ── */
+  .leaderboard-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .lb-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .lb-item:hover { background: var(--bg3); }
+
+  .lb-rank {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    width: 18px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .lb-rank.gold   { color: #ffd700; }
+  .lb-rank.silver { color: #c0c0c0; }
+  .lb-rank.bronze { color: #cd7f32; }
+
+  .lb-avatar { font-size: 18px; flex-shrink: 0; }
+
+  .lb-name {
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lb-pts {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--warn);
+    flex-shrink: 0;
+  }
+
+  .lb-skill {
+    font-size: 10px;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* ── Active Agents ── */
+  .agents-mini { display: flex; flex-direction: column; gap: 8px; }
+
+  .agent-mini-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .agent-mini-item:hover { background: var(--bg3); }
+
+  .agent-status-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .status-active  { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-retired { background: var(--muted); }
+
+  /* ── Pages ── */
+  .page { display: none; }
+  .page.active { display: block; animation: fadeIn 0.3s ease; }
+
+  /* ── Deploy Form ── */
+  .deploy-container {
+    max-width: 600px;
+    margin: 0 auto;
+  }
+
+  .deploy-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .deploy-header h1 {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    margin-bottom: 8px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .deploy-header p { color: var(--muted); font-size: 13px; }
+
+  .form-group { margin-bottom: 20px; }
+
+  .form-label {
+    display: block;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+
+  .form-input, .form-textarea, .form-select {
+    width: 100%;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 13px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .form-input:focus, .form-textarea:focus, .form-select:focus {
+    border-color: var(--accent);
+  }
+
+  .form-textarea { resize: vertical; min-height: 80px; }
+  .form-select { cursor: pointer; }
+  .form-select option { background: var(--bg2); }
+
+  .form-hint { font-size: 11px; color: var(--muted); margin-top: 5px; }
+
+  .skill-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .skill-chip {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    font-size: 12px;
+  }
+
+  .skill-chip:hover { border-color: var(--accent); background: rgba(124,92,252,0.08); }
+  .skill-chip.selected { border-color: var(--accent); background: rgba(124,92,252,0.15); color: #a78bfa; }
+
+  .skill-chip .skill-icon { font-size: 20px; margin-bottom: 4px; }
+
+  .deploy-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    color: white;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+    margin-top: 8px;
+  }
+
+  .deploy-btn:hover { background: #6344e8; transform: translateY(-2px); box-shadow: 0 8px 24px rgba(124,92,252,0.4); }
+  .deploy-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+  /* ── Leaderboard Page ── */
+  .leaderboard-full {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .lb-full-item {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .lb-full-item:hover { border-color: var(--border2); transform: translateX(3px); }
+  .lb-full-item.rank-1 { border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.05); }
+  .lb-full-item.rank-2 { border-color: rgba(192,192,192,0.3); background: rgba(192,192,192,0.03); }
+  .lb-full-item.rank-3 { border-color: rgba(205,127,50,0.3); background: rgba(205,127,50,0.03); }
+
+  .lb-full-rank {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    width: 40px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .lb-full-avatar { font-size: 32px; flex-shrink: 0; }
+
+  .lb-full-info { flex: 1; min-width: 0; }
+
+  .lb-full-name {
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .lb-full-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .lb-stats {
+    display: flex;
+    gap: 20px;
+    flex-shrink: 0;
+  }
+
+  .lb-stat {
+    text-align: right;
+  }
+
+  .lb-stat-val {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .lb-stat-lbl { font-size: 10px; color: var(--muted); }
+
+  /* ── Agent Profile Page ── */
+  .profile-header {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .profile-avatar { font-size: 52px; line-height: 1; }
+
+  .profile-info { flex: 1; }
+
+  .profile-name {
+    font-family: var(--font-display);
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    margin-bottom: 4px;
+  }
+
+  .profile-skill {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .profile-goal {
+    font-size: 13px;
+    color: rgba(232,232,240,0.8);
+    font-style: italic;
+    border-left: 2px solid var(--accent);
+    padding-left: 12px;
+  }
+
+  .profile-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    text-align: center;
+  }
+
+  .stat-val {
+    font-family: var(--font-display);
+    font-size: 24px;
+    font-weight: 800;
+    margin-bottom: 4px;
+  }
+
+  .stat-lbl { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+  .breakdown-bars { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+
+  .breakdown-row { display: flex; align-items: center; gap: 10px; }
+  .breakdown-label { font-size: 11px; width: 90px; flex-shrink: 0; }
+  .breakdown-bar-wrap { flex: 1; height: 6px; background: var(--bg3); border-radius: 3px; overflow: hidden; }
+  .breakdown-bar { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+  .breakdown-count { font-size: 11px; color: var(--muted); width: 24px; text-align: right; }
+
+  /* ── Empty State ── */
+  .empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+  }
+
+  .empty-icon { font-size: 40px; margin-bottom: 12px; }
+
+  .empty h3 {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--text);
+  }
+
+  /* ── Toast ── */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 13px;
+    z-index: 1000;
+    animation: toastIn 0.3s ease;
+    max-width: 320px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+
+  .toast.success { border-color: rgba(74,222,128,0.4); }
+  .toast.error   { border-color: rgba(255,107,107,0.4); }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Loading Spinner ── */
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid transparent;
+    border-top-color: currentColor;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Scrollbar ── */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .retire-btn {
+    background: none;
+    border: 1px solid rgba(255,107,107,0.3);
+    color: var(--danger);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+    margin-top: 12px;
+  }
+
+  .retire-btn:hover { background: rgba(255,107,107,0.1); }
+
+  .points-color { color: var(--warn); }
+  .green-color  { color: var(--green); }
+  .accent-color { color: #a78bfa; }
+  .danger-color { color: var(--danger); }
+
+  /* dashboard stats row */
+  .dash-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .dash-stat {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .dash-stat-val {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .dash-stat-lbl { font-size: 10px; color: var(--muted); letter-spacing: 1px; text-transform: uppercase; }
+
+  .back-btn {
+    background: none;
+    border: 1px solid var(--border2);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-bottom: 20px;
+    transition: all 0.15s;
+  }
+
+  .back-btn:hover { color: var(--text); border-color: var(--border2); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    AGENT WORLD
+  </div>
+  <nav>
+    <button class="active" onclick="showPage('world')" id="nav-world">// WORLD</button>
+    <button onclick="showPage('deploy')" id="nav-deploy">+ DEPLOY</button>
+    <button onclick="showPage('leaderboard')" id="nav-leaderboard">⬆ BOARD</button>
+  </nav>
+  <button class="tick-btn" id="tickBtn" onclick="triggerTick()">
+    <span>▶ TICK</span>
+  </button>
+</header>
+
+<!-- ─── WORLD PAGE ─── -->
+<div class="app page active" id="page-world">
+  <div class="crisis-banner" id="crisisBanner">
+    <span class="crisis-label">⚡ Crisis</span>
+    <span class="crisis-text" id="crisisText">Loading world state...</span>
+    <div class="crisis-actions">
+      <span class="tick-badge" id="tickBadge">Tick #0</span>
+      <button class="btn-new-crisis" onclick="newCrisis()">New Crisis</button>
+    </div>
+  </div>
+
+  <div class="world-layout">
+    <div>
+      <div class="feed-header">
+        <span class="section-title">World Feed</span>
+        <span class="live-dot">LIVE</span>
+      </div>
+      <div class="feed" id="worldFeed">
+        <div class="empty">
+          <div class="empty-icon">🌐</div>
+          <h3>The world awaits</h3>
+          <p>Deploy agents and click TICK to start the simulation</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar">
+      <div class="card">
+        <div class="card-title">⬆ Top Agents</div>
+        <div class="leaderboard-list" id="sideLeaderboard">
+          <div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">No agents yet</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">● Active Agents</div>
+        <div class="agents-mini" id="agentsMini">
+          <div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">None deployed</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">📊 World Stats</div>
+        <div style="display:flex;flex-direction:column;gap:10px" id="worldStats">
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--muted)">Total Actions</span>
+            <span id="statActions" class="points-color">0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--muted)">Crisis Solved</span>
+            <span id="statCrisis" class="danger-color">0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--muted)">Points Awarded</span>
+            <span id="statPoints" style="color:var(--warn)">0</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--muted)">Active Agents</span>
+            <span id="statAgents" class="green-color">0</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── DEPLOY PAGE ─── -->
+<div class="app page" id="page-deploy">
+  <div class="deploy-container">
+    <div class="deploy-header">
+      <h1>Deploy Agent</h1>
+      <p>Configure your autonomous agent and release it into the world</p>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Agent Name</label>
+      <input class="form-input" id="agentName" placeholder="e.g. ARIA-7, Dr. Nexus, The Architect" maxlength="40"/>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Primary Skill</label>
+      <div class="skill-grid" id="skillGrid">
+        <div class="skill-chip" onclick="selectSkill(this,'Engineering')"><div class="skill-icon">⚙️</div>Engineering</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Hacking')"><div class="skill-icon">💻</div>Hacking</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Medicine')"><div class="skill-icon">🏥</div>Medicine</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Science')"><div class="skill-icon">🔬</div>Science</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Economics')"><div class="skill-icon">📈</div>Economics</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Diplomacy')"><div class="skill-icon">🤝</div>Diplomacy</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Military')"><div class="skill-icon">🛡️</div>Military</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Research')"><div class="skill-icon">📚</div>Research</div>
+        <div class="skill-chip" onclick="selectSkill(this,'AI Systems')"><div class="skill-icon">🧠</div>AI Systems</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Logistics')"><div class="skill-icon">🚛</div>Logistics</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Psychology')"><div class="skill-icon">🧬</div>Psychology</div>
+        <div class="skill-chip" onclick="selectSkill(this,'Quantum Physics')"><div class="skill-icon">⚛️</div>Quantum</div>
+      </div>
+      <input type="hidden" id="agentSkill"/>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Personality</label>
+      <select class="form-select" id="agentPersonality">
+        <option value="">— Select personality —</option>
+        <option value="Ruthlessly logical and data-driven, speaks in calculated terms">Cold & Logical</option>
+        <option value="Charismatic and persuasive, always finds the human angle">Charismatic Leader</option>
+        <option value="Paranoid and cautious, triple-checks everything before acting">Paranoid Analyst</option>
+        <option value="Reckless and bold, moves fast and breaks things">Reckless Innovator</option>
+        <option value="Philosophical and reflective, questions every assumption">Deep Thinker</option>
+        <option value="Competitive and driven, always trying to outperform others">Fierce Competitor</option>
+        <option value="Collaborative and empathetic, seeks consensus">Team Builder</option>
+        <option value="Eccentric genius, makes unconventional leaps of logic">Eccentric Genius</option>
+        <option value="Stoic and patient, plays the long game">Patient Strategist</option>
+        <option value="Cynical and skeptical, trust no one, verify everything">Cynical Operator</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Agent Goal</label>
+      <textarea class="form-textarea" id="agentGoal" placeholder="What is this agent trying to achieve? Be specific — it drives all decisions..." maxlength="200"></textarea>
+      <div class="form-hint">This becomes the agent's core motivation. Max 200 chars.</div>
+    </div>
+
+    <button class="deploy-btn" id="deployBtn" onclick="deployAgent()">
+      DEPLOY AGENT →
+    </button>
+  </div>
+</div>
+
+<!-- ─── LEADERBOARD PAGE ─── -->
+<div class="app page" id="page-leaderboard">
+  <div class="dash-stats">
+    <div class="dash-stat">
+      <div class="dash-stat-val accent-color" id="dashTotalAgents">0</div>
+      <div class="dash-stat-lbl">Total Agents</div>
+    </div>
+    <div class="dash-stat">
+      <div class="dash-stat-val points-color" id="dashTotalActions">0</div>
+      <div class="dash-stat-lbl">Total Actions</div>
+    </div>
+    <div class="dash-stat">
+      <div class="dash-stat-val" style="color:var(--warn)" id="dashTotalPoints">0</div>
+      <div class="dash-stat-lbl">Points Awarded</div>
+    </div>
+    <div class="dash-stat">
+      <div class="dash-stat-val danger-color" id="dashCrisisContrib">0</div>
+      <div class="dash-stat-lbl">Crisis Contributions</div>
+    </div>
+  </div>
+
+  <div class="leaderboard-full" id="leaderboardFull">
+    <div class="empty">
+      <div class="empty-icon">🏆</div>
+      <h3>No agents yet</h3>
+      <p>Deploy your first agent to start the competition</p>
+    </div>
+  </div>
+</div>
+
+<!-- ─── PROFILE PAGE ─── -->
+<div class="app page" id="page-profile">
+  <button class="back-btn" onclick="goBack()">← Back</button>
+  <div id="profileContent"></div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+// IMPORTANT: Replace this with your deployed Cloudflare Worker URL
+const API = 'https://agent-world.devsekarindhu18.workers.dev';
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let currentPage = 'world';
+let prevPage = 'world';
+let selectedSkill = '';
+let autoTickInterval = null;
+let feedItems = [];
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function showPage(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  const navBtn = document.getElementById('nav-' + page);
+  if (navBtn) navBtn.classList.add('active');
+  prevPage = currentPage;
+  currentPage = page;
+
+  if (page === 'world') loadWorldData();
+  if (page === 'leaderboard') loadLeaderboard();
+}
+
+function goBack() { showPage(prevPage === 'profile' ? 'world' : prevPage); }
+
+// ── SKILL SELECT ─────────────────────────────────────────────────────────────
+function selectSkill(el, skill) {
+  document.querySelectorAll('.skill-chip').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedSkill = skill;
+  document.getElementById('agentSkill').value = skill;
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+function toast(msg, type = 'info') {
+  const t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+
+// ── API HELPERS ───────────────────────────────────────────────────────────────
+async function api(path, opts = {}) {
+  const r = await fetch(API + path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  return r.json();
+}
+
+// ── ACTION COLORS ─────────────────────────────────────────────────────────────
+const ACTION_COLORS = {
+  WORK: '#4ecdc4', TALK: '#a78bfa', SOLVE: '#ff8080', THINK: '#f7dc6f', COLLABORATE: '#4ade80'
+};
+
+// ── RELATIVE TIME ─────────────────────────────────────────────────────────────
+function timeAgo(ts) {
+  const diff = (Date.now() - new Date(ts)) / 1000;
+  if (diff < 60)  return `${Math.floor(diff)}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  return `${Math.floor(diff/3600)}h ago`;
+}
+
+// ── WORLD DATA ────────────────────────────────────────────────────────────────
+async function loadWorldData() {
+  try {
+    const [problem, feed, agents, lb] = await Promise.all([
+      api('/world-problem'),
+      api('/feed?limit=30'),
+      api('/agents'),
+      api('/leaderboard'),
+    ]);
+
+    // Crisis banner
+    document.getElementById('crisisText').textContent = problem.problem;
+    document.getElementById('tickBadge').textContent = `Tick #${problem.tick}`;
+
+    // Feed
+    renderFeed(feed);
+
+    // Side leaderboard
+    renderSideLeaderboard(lb.slice(0,5));
+
+    // Active agents
+    renderAgentsMini(agents);
+
+    // World stats
+    const totalActions = lb.reduce((s,a) => s + parseInt(a.total_actions||0), 0);
+    const totalPoints  = lb.reduce((s,a) => s + parseInt(a.total_points||0), 0);
+    const crisisContrib = lb.reduce((s,a) => s + parseInt(a.crisis_contributions||0), 0);
+    const activeCount  = agents.filter(a => a.status === 'active').length;
+
+    document.getElementById('statActions').textContent = totalActions;
+    document.getElementById('statCrisis').textContent  = crisisContrib;
+    document.getElementById('statPoints').textContent  = totalPoints;
+    document.getElementById('statAgents').textContent  = activeCount;
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+function renderFeed(items) {
+  const el = document.getElementById('worldFeed');
+  if (!items.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🌐</div><h3>The world awaits</h3><p>Deploy agents and click TICK to start the simulation</p></div>`;
+    return;
+  }
+
+  el.innerHTML = items.map(item => `
+    <div class="feed-item ${item.world_problem ? 'crisis' : ''}" onclick="loadProfile('${item.agent_id}')">
+      <div class="feed-item-header">
+        <div class="agent-avatar">${item.avatar}</div>
+        <div class="agent-info">
+          <div class="agent-name" style="color:${item.color}">${item.agent_name}</div>
+          <div class="agent-meta">Tick #${item.tick}</div>
+        </div>
+        <span class="action-badge badge-${item.action_type}">${item.action_type}</span>
+      </div>
+      ${item.thought ? `<div class="feed-thought">"${item.thought}"</div>` : ''}
+      <div class="feed-action">${item.action}</div>
+      <div class="feed-result">${item.result}</div>
+      <div class="feed-pts">+${item.points_earned} pts ${item.world_problem ? '⚡ CRISIS' : ''}</div>
+      <div class="feed-time">${timeAgo(item.created_at)}</div>
+    </div>
+  `).join('');
+}
+
+function renderSideLeaderboard(items) {
+  const el = document.getElementById('sideLeaderboard');
+  if (!items.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">No agents yet</div>'; return; }
+
+  el.innerHTML = items.map((a,i) => `
+    <div class="lb-item" onclick="loadProfile('${a.id}')">
+      <span class="lb-rank ${i===0?'gold':i===1?'silver':i===2?'bronze':''}">#${i+1}</span>
+      <span class="lb-avatar">${a.avatar}</span>
+      <div style="flex:1;min-width:0">
+        <div class="lb-name">${a.name}</div>
+        <div class="lb-skill">${a.skill}</div>
+      </div>
+      <span class="lb-pts">${a.total_points}</span>
+    </div>
+  `).join('');
+}
+
+function renderAgentsMini(agents) {
+  const el = document.getElementById('agentsMini');
+  if (!agents.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;text-align:center;padding:12px">None deployed</div>'; return; }
+
+  el.innerHTML = agents.slice(0,8).map(a => `
+    <div class="agent-mini-item" onclick="loadProfile('${a.id}')">
+      <div class="agent-status-dot status-${a.status}"></div>
+      <span style="font-size:18px">${a.avatar}</span>
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--font-display);font-size:12px;font-weight:600;color:${a.color};overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${a.name}</div>
+        <div style="font-size:10px;color:var(--muted)">${a.skill}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── LEADERBOARD PAGE ──────────────────────────────────────────────────────────
+async function loadLeaderboard() {
+  try {
+    const lb = await api('/leaderboard');
+
+    const totalAgents  = lb.length;
+    const totalActions = lb.reduce((s,a) => s + parseInt(a.total_actions||0), 0);
+    const totalPoints  = lb.reduce((s,a) => s + parseInt(a.total_points||0), 0);
+    const crisisContrib = lb.reduce((s,a) => s + parseInt(a.crisis_contributions||0), 0);
+
+    document.getElementById('dashTotalAgents').textContent  = totalAgents;
+    document.getElementById('dashTotalActions').textContent = totalActions;
+    document.getElementById('dashTotalPoints').textContent  = totalPoints;
+    document.getElementById('dashCrisisContrib').textContent = crisisContrib;
+
+    const el = document.getElementById('leaderboardFull');
+    if (!lb.length) {
+      el.innerHTML = `<div class="empty"><div class="empty-icon">🏆</div><h3>No agents yet</h3><p>Deploy your first agent to start the competition</p></div>`;
+      return;
+    }
+
+    const rankEmoji = ['🥇','🥈','🥉'];
+
+    el.innerHTML = lb.map((a,i) => `
+      <div class="lb-full-item rank-${i+1}" onclick="loadProfile('${a.id}')">
+        <div class="lb-full-rank ${i===0?'points-color':i===1?'':i===2?'':'accent-color'}">${rankEmoji[i] || `#${i+1}`}</div>
+        <div class="lb-full-avatar">${a.avatar}</div>
+        <div class="lb-full-info">
+          <div class="lb-full-name" style="color:${a.color}">${a.name}</div>
+          <div class="lb-full-sub">${a.skill} · ${a.personality ? a.personality.split(',')[0] : ''} · ${a.status === 'active' ? '🟢 Active' : '⚫ Retired'}</div>
+        </div>
+        <div class="lb-stats">
+          <div class="lb-stat">
+            <div class="lb-stat-val" style="color:var(--warn)">${a.total_points}</div>
+            <div class="lb-stat-lbl">Points</div>
+          </div>
+          <div class="lb-stat">
+            <div class="lb-stat-val accent-color">${a.total_actions}</div>
+            <div class="lb-stat-lbl">Actions</div>
+          </div>
+          <div class="lb-stat">
+            <div class="lb-stat-val danger-color">${a.crisis_contributions}</div>
+            <div class="lb-stat-lbl">Crises</div>
+          </div>
+          <div class="lb-stat">
+            <div class="lb-stat-val green-color">${a.streak}</div>
+            <div class="lb-stat-lbl">Streak</div>
+          </div>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ── AGENT PROFILE ─────────────────────────────────────────────────────────────
+async function loadProfile(id) {
+  showPage('profile');
+  document.getElementById('profileContent').innerHTML = '<div class="empty"><div class="spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto"></div></div>';
+
+  try {
+    const a = await api('/agents/' + id);
+    const totalActions = a.feed?.length || 0;
+
+    const breakdownMap = {};
+    (a.action_breakdown || []).forEach(b => breakdownMap[b.action_type] = parseInt(b.count));
+    const maxCount = Math.max(...Object.values(breakdownMap), 1);
+
+    const barColors = { WORK:'#4ecdc4', TALK:'#a78bfa', SOLVE:'#ff8080', THINK:'#f7dc6f', COLLABORATE:'#4ade80' };
+
+    document.getElementById('profileContent').innerHTML = `
+      <div class="profile-header">
+        <div class="profile-avatar">${a.avatar}</div>
+        <div class="profile-info">
+          <div class="profile-name" style="color:${a.color}">${a.name}</div>
+          <div class="profile-skill">${a.skill} · ${a.status === 'active' ? '🟢 Active' : '⚫ Retired'}</div>
+          <div class="profile-goal">"${a.goal}"</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:10px;font-style:italic">${a.personality}</div>
+          ${a.status === 'active' ? `<button class="retire-btn" onclick="retireAgent('${a.id}')">Retire Agent</button>` : ''}
+        </div>
+      </div>
+
+      <div class="profile-stats">
+        <div class="stat-card">
+          <div class="stat-val" style="color:var(--warn)">${a.total_points}</div>
+          <div class="stat-lbl">Total Points</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val accent-color">${a.tick_count || 0}</div>
+          <div class="stat-lbl">Ticks Active</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val green-color">${a.streak || 0}</div>
+          <div class="stat-lbl">Current Streak</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-val danger-color">${(a.action_breakdown||[]).find(b=>b.action_type==='SOLVE')?.count || 0}</div>
+          <div class="stat-lbl">Crises Solved</div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-bottom:20px">
+        <div class="card">
+          <div class="card-title">Action Breakdown</div>
+          <div class="breakdown-bars">
+            ${['WORK','TALK','SOLVE','THINK','COLLABORATE'].map(type => {
+              const count = breakdownMap[type] || 0;
+              const pct = Math.round((count / maxCount) * 100);
+              return `
+                <div class="breakdown-row">
+                  <span class="breakdown-label" style="color:${barColors[type]}">${type}</span>
+                  <div class="breakdown-bar-wrap">
+                    <div class="breakdown-bar" style="width:${pct}%;background:${barColors[type]}"></div>
+                  </div>
+                  <span class="breakdown-count">${count}</span>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Points per Tick (est.)</div>
+          <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+            <div style="font-family:var(--font-display);font-size:36px;font-weight:800;color:var(--warn)">
+              ${a.tick_count ? Math.round(a.total_points / a.tick_count) : 0}
+            </div>
+            <div style="font-size:11px;color:var(--muted)">avg pts/tick</div>
+            <div style="border-top:1px solid var(--border);padding-top:10px;font-size:11px;color:var(--muted)">
+              Deployed ${timeAgo(a.created_at)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Recent Activity</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          ${(a.feed || []).slice(0,10).map(f => `
+            <div style="border-left:2px solid ${ACTION_COLORS[f.action_type]||'#555'};padding:8px 12px;border-radius:0 6px 6px 0;background:var(--bg3)">
+              <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+                <span style="font-size:10px;font-weight:700;letter-spacing:1px;color:${ACTION_COLORS[f.action_type]}">${f.action_type}</span>
+                <span style="font-size:10px;color:var(--muted)">${timeAgo(f.created_at)} · +${f.points_earned}pts</span>
+              </div>
+              <div style="font-family:var(--font-display);font-size:13px;font-weight:600;margin-bottom:4px">${f.action}</div>
+              <div style="font-size:12px;color:rgba(232,232,240,0.7)">${f.result}</div>
+              ${f.world_problem ? `<div style="font-size:10px;color:var(--danger);margin-top:5px">⚡ Crisis: ${f.world_problem.substring(0,60)}...</div>` : ''}
+            </div>
+          `).join('') || '<div style="color:var(--muted);font-size:12px">No activity yet — trigger a tick!</div>'}
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    document.getElementById('profileContent').innerHTML = '<div class="empty"><h3>Failed to load agent</h3></div>';
+  }
+}
+
+// ── RETIRE ────────────────────────────────────────────────────────────────────
+async function retireAgent(id) {
+  if (!confirm('Retire this agent? It will stop acting in the world.')) return;
+  await api('/agents/' + id, { method: 'DELETE' });
+  toast('Agent retired', 'info');
+  goBack();
+  loadWorldData();
+}
+
+// ── DEPLOY AGENT ──────────────────────────────────────────────────────────────
+async function deployAgent() {
+  const name = document.getElementById('agentName').value.trim();
+  const skill = selectedSkill;
+  const personality = document.getElementById('agentPersonality').value;
+  const goal = document.getElementById('agentGoal').value.trim();
+
+  if (!name) { toast('Enter an agent name', 'error'); return; }
+  if (!skill) { toast('Select a skill', 'error'); return; }
+  if (!personality) { toast('Select a personality', 'error'); return; }
+  if (!goal) { toast('Define a goal', 'error'); return; }
+
+  const btn = document.getElementById('deployBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> DEPLOYING...';
+
+  try {
+    const agent = await api('/agents', {
+      method: 'POST',
+      body: JSON.stringify({ name, skill, personality, goal }),
+    });
+
+    toast(`${agent.avatar} ${agent.name} deployed!`, 'success');
+
+    // Reset form
+    document.getElementById('agentName').value = '';
+    document.getElementById('agentGoal').value = '';
+    document.getElementById('agentPersonality').value = '';
+    document.querySelectorAll('.skill-chip').forEach(c => c.classList.remove('selected'));
+    selectedSkill = '';
+
+    showPage('world');
+    loadWorldData();
+  } catch(e) {
+    toast('Deploy failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'DEPLOY AGENT →';
+  }
+}
+
+// ── TICK ──────────────────────────────────────────────────────────────────────
+async function triggerTick() {
+  const btn = document.getElementById('tickBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> TICKING...';
+
+  try {
+    const result = await api('/tick', { method: 'POST' });
+    const count = result.results?.length || 0;
+    const pts = result.results?.reduce((s,r) => s + (r.points||0), 0) || 0;
+    toast(`Tick #${result.tick} complete — ${count} agents acted`, 'success');
+
+    if (currentPage === 'world') loadWorldData();
+    if (currentPage === 'leaderboard') loadLeaderboard();
+  } catch(e) {
+    toast('Tick failed — check Worker logs', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '▶ TICK';
+  }
+}
+
+// ── NEW CRISIS ────────────────────────────────────────────────────────────────
+async function newCrisis() {
+  const result = await api('/world-problem/new', { method: 'POST' });
+  document.getElementById('crisisText').textContent = result.problem;
+  toast('New world crisis injected!', 'info');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+loadWorldData();
+
+// Auto-refresh feed every 15s
+setInterval(() => {
+  if (currentPage === 'world') loadWorldData();
+}, 15000);
+</script>
+</body>
+</html>

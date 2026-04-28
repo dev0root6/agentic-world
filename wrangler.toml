@@ -1,0 +1,17 @@
+name = "agent-world"
+main = "index.js"
+compatibility_date = "2024-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Secrets — set with:
+#   wrangler secret put DATABASE_URL
+#   wrangler secret put OPENROUTER_API_KEY
+#
+# DATABASE_URL format:
+#   postgresql://user:password@ep-xxx-yyy.region.aws.neon.tech/dbname?sslmode=require
+#
+# Get it from: Neon Console → your project → Connection Details → Connection string
+
+# Optional: auto-tick every 2 minutes (uncomment to enable)
+# [triggers]
+# crons = ["*/2 * * * *"]
