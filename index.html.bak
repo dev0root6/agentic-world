@@ -216,7 +216,7 @@ canvas{image-rendering:pixelated;image-rendering:crisp-edges;display:block;}
 // ── CONFIG ──────────────────────────────────────────────────────────
 const API   = 'https://agent-world.devsekarindhu18.workers.dev';
 // SHA-256 hashes of credentials — plaintext never stored
-// user: whtedvl | pass: whtedvl@123
+// user: helloworld | pass: helloworld@123
 const HASHED = {
   user: '1dd57b6c66db4c2cbc3550cc1650e2fd689c16e4b0c80b8b87e5b834b797cad3',
   pass: '9bf871ac6e88e30dc800129ba193e32597840eda7d49cfa71c7aa9efa4bbd669',
